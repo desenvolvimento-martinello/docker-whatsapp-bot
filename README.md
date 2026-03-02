@@ -1,4 +1,12 @@
-\#  Bot WhatsApp – Gerenciamento Seguro de Containers Docker (Evolution)
+#  WhatsApp Docker Management Bot
+Node.js • Docker • Evolution API
+##  Tecnologias
+- Node.js
+- Express
+- Dockerode
+- Evolution API
+
+\##  Bot WhatsApp – Gerenciamento Seguro de Containers Docker (Evolution)
 
 
 

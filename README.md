@@ -16,7 +16,7 @@ A aplicação se comunica com o Docker via Docker SDK (dockerode).
 
 ---
 
-## 🛠 Tecnologias
+##  Tecnologias
 
 - Node.js
 - Express
@@ -82,7 +82,7 @@ docker restart <container>
 
 ---
 
-## ⚙️ Como Configurar
+##  Como Configurar
 
 ###  Instalar dependências
 

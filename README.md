@@ -1,125 +1,278 @@
-#  WhatsApp Docker Management Bot
-Node.js • Docker • Evolution API
-##  Tecnologias
+#  Bot WhatsApp para Gerenciamento de Containers Docker
+
+##  Objetivo
+
+Permitir, via WhatsApp, executar operações seguras e controladas em containers Docker.
+
+A solução é determinística (sem IA) e responde apenas a comandos pré-definidos.
+
+---
+
+##  Arquitetura
+
+WhatsApp → Evolution API → Webhook → Node.js API → Docker Engine (TCP 2375)
+
+A aplicação se comunica com o Docker via Docker SDK (dockerode).
+
+---
+
+## 🛠 Tecnologias
+
 - Node.js
 - Express
 - Dockerode
+- Docker Desktop
 - Evolution API
-
-\##  Bot WhatsApp – Gerenciamento Seguro de Containers Docker (Evolution)
-
-
-
-Solução determinística (sem IA) para gerenciar containers Docker via WhatsApp, usando Evolution API como gateway.
-
-
-
-\##  Funcionalidades (Escopo do Desafio)
-
-1\) \*\*Listar containers\*\*
-
-\- Comando: `docker containers`
-
-\- Retorna: Nome, Status, ID curto
-
-
-
-2\) \*\*Visualizar logs\*\*
-
-\- Comando: `docker logs <container> <linhas>`
-
-\- Retorna últimas N linhas (limitado por `MAX\\\_LOG\\\_LINES`)
-
-
-
-3\) \*\*Gerenciar containers\*\*
-
-\- `docker start <container>`
-
-\- `docker stop <container>`
-
-\- `docker restart <container>`
-
-
+- Docker Compose
 
 ---
 
+##  Funcionalidades
 
+###  Listar containers
 
-\##  Segurança (Obrigatório)
+Comando:
 
-Medidas aplicadas:
+```bash
+docker containers
+```
 
-\-  Apenas comandos pré-definidos (`help/containers/logs/start/stop/restart`)
-
-\-  Validação de parâmetros:
-
-  - nome do container (regex + lista permitida)
-
-  - limite máximo de logs (`MAX\\\_LOG\\\_LINES`)
-
-\-  Não executa comandos arbitrários (sem shell/terminal)
-
-\-  Whitelist de usuários (`ALLOWED\\\_NUMBERS`)
-
-\-  Lista de containers permitidos (`ALLOWED\\\_CONTAINERS`)
-
-\-  Rate limit por usuário (evita flood)
-
-\-  Auditoria em arquivo (`audit.log`)
-
-\-  Anti-loop / deduplicação (evita reprocessar eventos e loops após restart)
-
-
+Retorna:
+- Nome
+- Status
+- ID curto
 
 ---
 
+###  Visualizar logs
 
+Comando:
 
-\##  Arquitetura
+```bash
+docker logs <container> <linhas>
+```
 
-WhatsApp -> Evolution API (webhook `MESSAGES\\\_UPSERT`) -> Bot (Node/Express) -> Docker Engine (Dockerode via TCP 2375) -> Evolution API (sendText) -> WhatsApp
-
-
-
----
-
-
-
-\##  Requisitos
-
-\- Windows 10/11
-
-\- Node.js 18+ (recomendado)
-
-\- Docker Desktop instalado
-
-\- Evolution API rodando via Docker Compose
-
-
+Retorna últimas N linhas (limitado por `MAX_LOG_LINES`).
 
 ---
 
+###  Gerenciar containers
 
+```bash
+docker start <container>
+docker stop <container>
+docker restart <container>
+```
 
-\## 1) Docker Desktop – habilitar TCP 2375
+---
+
+##  Segurança Implementada
+
+- Apenas comandos pré-definidos (`help`, `containers`, `logs`, `start`, `stop`, `restart`)
+- Validação de parâmetros (regex + lista permitida)
+- Limite máximo de logs (`MAX_LOG_LINES`)
+- Whitelist de usuários (`ALLOWED_NUMBERS`)
+- Lista de containers permitidos (`ALLOWED_CONTAINERS`)
+- Rate limit por usuário
+- Auditoria em arquivo (`audit.log`)
+- Prefixo obrigatório (`docker`)
+- Anti-loop (ignora mensagens enviadas pelo próprio bot)
+- Deduplicação de eventos (evita reprocessamento após restart)
+- Não executa comandos arbitrários ou shell
+
+---
+
+## ⚙️ Como Configurar
+
+###  Instalar dependências
+
+```bash
+npm install
+```
+
+---
+
+###  Habilitar Docker TCP 2375 (Windows)
 
 No Docker Desktop:
 
-\- Settings -> General
+Settings → General  
+Ativar:
 
-\- Ativar: \*\*Expose daemon on tcp://localhost:2375 without TLS\*\*
+```
+Expose daemon on tcp://localhost:2375 without TLS
+```
 
-\- Apply \& Restart
+Apply & Restart.
 
-
-
-Teste:
+Testar:
 
 ```powershell
-
 curl http://localhost:2375/version
+```
 
+---
 
+###  Subir Evolution via Docker Compose
 
+Crie o arquivo `docker-compose.yml`:
 
+```yaml
+version: "3.8"
+
+services:
+  evolution:
+    image: atendai/evolution-api:latest
+    container_name: evolution_api
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - SERVER_TYPE=http
+      - SERVER_PORT=8080
+      - AUTHENTICATION_API_KEY=MINHA_APIKEY_FORTE_123
+      - LOG_LEVEL=ERROR
+    volumes:
+      - evolution_data:/evolution
+
+volumes:
+  evolution_data:
+```
+
+Subir:
+
+```bash
+docker compose up -d
+```
+
+---
+
+###  Criar instância na Evolution
+
+```powershell
+$APIKEY="MINHA_APIKEY_FORTE_123"
+
+curl -Method POST "http://localhost:8080/instance/create" `
+  -Headers @{ apikey = $APIKEY; "Content-Type"="application/json" } `
+  -Body '{
+    "instanceName":"botdocker",
+    "integration":"WHATSAPP-BAILEYS",
+    "qrcode": true
+  }'
+```
+
+Caso retorne:
+
+```
+"This name 'botdocker' is already in use."
+```
+
+Execute:
+
+```powershell
+curl -Method GET "http://localhost:8080/instance/connect/botdocker" `
+  -Headers @{ apikey = $APIKEY }
+```
+
+---
+
+###  Configurar Webhook
+
+```powershell
+curl -Method POST "http://localhost:8080/webhook/set/botdocker" `
+  -Headers @{ apikey = $APIKEY; "Content-Type"="application/json" } `
+  -Body '{
+    "webhook": {
+      "enabled": true,
+      "url": "http://host.docker.internal:3000/webhook",
+      "events": ["MESSAGES_UPSERT"]
+    }
+  }'
+```
+
+---
+
+###  Criar arquivo `.env`
+
+Baseado em `.env.example`:
+
+```env
+PORT=3000
+
+COMMAND_PREFIX=docker
+
+ALLOWED_NUMBERS=556599596410
+ALLOWED_CONTAINERS=teste-nginx
+
+MAX_LOG_LINES=50
+RATE_LIMIT_MAX=10
+RATE_LIMIT_WINDOW_SEC=60
+AUDIT_LOG_FILE=audit.log
+
+EVOLUTION_URL=http://localhost:8080
+EVOLUTION_INSTANCE=botdocker
+EVOLUTION_APIKEY=MINHA_APIKEY_FORTE_123
+```
+
+---
+
+###  Iniciar o Bot
+
+```bash
+node server.js
+```
+
+Saída esperada:
+
+```
+Servidor rodando na porta 3000
+Prefixo obrigatório: "docker"
+Evolution: http://localhost:8080 | instance: botdocker
+```
+
+---
+
+##  Uso
+
+O bot responde apenas mensagens que começam com:
+
+```bash
+docker
+```
+
+Exemplo:
+
+```bash
+docker containers
+```
+
+Mensagens sem prefixo são ignoradas.
+
+---
+
+##  Estrutura do Projeto
+
+```text
+docker-whatsapp-bot/
+│
+├── server.js
+├── docker-compose.yml
+├── package.json
+├── .env.example
+├── .gitignore
+└── README.md
+```
+
+---
+
+##  Publicação no GitHub
+
+Crie `.gitignore`:
+
+```gitignore
+node_modules/
+.env
+audit.log
+```
+
+Nunca subir o `.env` real.
